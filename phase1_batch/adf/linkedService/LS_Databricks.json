@@ -1,0 +1,13 @@
+{
+    "name": "LS_Databricks",
+    "type": "Microsoft.DataFactory/factories/linkedservices",
+    "properties": {
+        "annotations": [],
+        "type": "AzureDatabricks",
+        "typeProperties": {
+            "domain": "https://adb-7405612678169014.14.azuredatabricks.net",
+            "authentication": "MSI",
+            "workspaceResourceId": "/subscriptions/e07fe778-f2ca-4f02-b627-a858fc22adfb/resourceGroups/rg-atliq-capstone/providers/Microsoft.Databricks/workspaces/dbw-atliq-capstone"
+        }
+    }
+}

@@ -1,0 +1,49 @@
+name: dbt CI
+
+on:
+  pull_request:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+jobs:
+  dbt-build:
+    name: Build and Test dbt
+    runs-on: ubuntu-latest
+
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_HTTP_PATH: ${{ secrets.DATABRICKS_HTTP_PATH }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+
+      
+      DBT_LOCATION_ROOT: abfss://lakehouse@atliqcommercestorage.dfs.core.windows.net/ci
+
+    defaults:
+      run:
+        working-directory: atliq_gold
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
+
+      - name: Install dbt Databricks
+        run: pip install dbt-databricks
+
+      - name: Install dbt packages
+        run: dbt deps --profiles-dir .
+
+      - name: Validate dbt connection
+        run: dbt debug --target ci --profiles-dir .
+
+      - name: Build models and run tests
+        run: dbt build --target ci --profiles-dir .

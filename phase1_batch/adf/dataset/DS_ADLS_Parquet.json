@@ -1,0 +1,40 @@
+{
+    "name": "DS_ADLS_Parquet",
+    "properties": {
+        "linkedServiceName": {
+            "referenceName": "LS_ADLS",
+            "type": "LinkedServiceReference"
+        },
+        "parameters": {
+            "p_table_name": {
+                "type": "string",
+                "defaultValue": "customers"
+            },
+            "p_partition": {
+                "type": "string"
+            },
+            "p_file_name": {
+                "type": "string"
+            }
+        },
+        "annotations": [],
+        "type": "Parquet",
+        "typeProperties": {
+            "location": {
+                "type": "AzureBlobFSLocation",
+                "fileName": {
+                    "value": "@dataset().p_file_name",
+                    "type": "Expression"
+                },
+                "folderPath": {
+                    "value": "@concat(\n    'bronze/',\n    dataset().p_table_name,\n    if(\n        empty(dataset().p_partition),\n        '',\n        concat('/', dataset().p_partition)\n    )\n)",
+                    "type": "Expression"
+                },
+                "fileSystem": "lakehouse"
+            },
+            "compressionCodec": "snappy"
+        },
+        "schema": []
+    },
+    "type": "Microsoft.DataFactory/factories/datasets"
+}

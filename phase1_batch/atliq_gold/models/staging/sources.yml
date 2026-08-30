@@ -1,0 +1,14 @@
+version: 2
+
+sources:
+  - name: silver
+    catalog: dbw_atliq_capstone
+    schema: silver
+
+    tables:
+      - name: customers
+      - name: products
+      - name: orders
+      - name: order_items
+      - name: payments
+      - name: supplier_price_list

@@ -1,0 +1,32 @@
+resources:
+  jobs:
+    job_atliq_nightly_transform:
+      name: job_atliq_nightly_transform
+      tasks:
+        - task_key: silver_load
+          notebook_task:
+            notebook_path: /Workspace/Users/changkisha@outlook.com/02_load_silver
+            base_parameters:
+              run_date: 2026-08-20
+            source: WORKSPACE
+        - task_key: gold_dbt_build
+          depends_on:
+            - task_key: silver_load
+          dbt_task:
+            project_directory: /Workspace/Users/changkisha@outlook.com/atliq-commerce-data-engineering/atliq_gold
+            commands:
+              - dbt build
+            schema: gold
+            warehouse_id: c1a027589ea7c6d2
+            catalog: dbw_atliq_capstone
+            source: WORKSPACE
+          environment_key: dbt-default
+      queue:
+        enabled: true
+      environments:
+        - environment_key: dbt-default
+          spec:
+            dependencies:
+              - dbt-databricks>=1.0.0,<2.0.0
+            environment_version: "5"
+      performance_target: PERFORMANCE_OPTIMIZED

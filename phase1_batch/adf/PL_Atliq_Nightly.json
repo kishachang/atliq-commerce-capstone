@@ -1,0 +1,490 @@
+{
+    "name": "PL_Atliq_Nightly",
+    "properties": {
+        "activities": [
+            {
+                "name": "Set_Run_Start",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "policy": {
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "variableName": "run_start_at",
+                    "value": {
+                        "value": "@utcnow()",
+                        "type": "Expression"
+                    }
+                }
+            },
+            {
+                "name": "Lookup_Control_Table",
+                "type": "Lookup",
+                "dependsOn": [
+                    {
+                        "activity": "Set_Run_Start",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "source": {
+                        "type": "AzureSqlSource",
+                        "queryTimeout": "02:00:00",
+                        "partitionOption": "None"
+                    },
+                    "dataset": {
+                        "referenceName": "DS_AzureSQL_Generic",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "p_schema": "etl",
+                            "p_table_name": "control_table"
+                        }
+                    },
+                    "firstRowOnly": false
+                }
+            },
+            {
+                "name": "ForEach_Source_Table",
+                "type": "ForEach",
+                "dependsOn": [
+                    {
+                        "activity": "Lookup_Control_Table",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "items": {
+                        "value": "@activity('Lookup_Control_Table').output.value",
+                        "type": "Expression"
+                    },
+                    "isSequential": true,
+                    "activities": [
+                        {
+                            "name": "If_Incremental",
+                            "type": "IfCondition",
+                            "dependsOn": [],
+                            "userProperties": [],
+                            "typeProperties": {
+                                "expression": {
+                                    "value": "@equals(item().load_type,'incremental')",
+                                    "type": "Expression"
+                                },
+                                "ifFalseActivities": [
+                                    {
+                                        "name": "Copy_Full_To_Bronze",
+                                        "type": "Copy",
+                                        "dependsOn": [],
+                                        "policy": {
+                                            "timeout": "0.12:00:00",
+                                            "retry": 0,
+                                            "retryIntervalInSeconds": 30,
+                                            "secureOutput": false,
+                                            "secureInput": false
+                                        },
+                                        "userProperties": [],
+                                        "typeProperties": {
+                                            "source": {
+                                                "type": "AzureSqlSource",
+                                                "queryTimeout": "02:00:00",
+                                                "partitionOption": "None"
+                                            },
+                                            "sink": {
+                                                "type": "ParquetSink",
+                                                "storeSettings": {
+                                                    "type": "AzureBlobFSWriteSettings"
+                                                },
+                                                "formatSettings": {
+                                                    "type": "ParquetWriteSettings"
+                                                }
+                                            },
+                                            "enableStaging": false,
+                                            "translator": {
+                                                "type": "TabularTranslator",
+                                                "typeConversion": true,
+                                                "typeConversionSettings": {
+                                                    "allowDataTruncation": true,
+                                                    "treatBooleanAsNumber": false
+                                                }
+                                            }
+                                        },
+                                        "inputs": [
+                                            {
+                                                "referenceName": "DS_AzureSQL_Generic",
+                                                "type": "DatasetReference",
+                                                "parameters": {
+                                                    "p_schema": {
+                                                        "value": "@item().source_schema",
+                                                        "type": "Expression"
+                                                    },
+                                                    "p_table_name": {
+                                                        "value": "@item().table_name",
+                                                        "type": "Expression"
+                                                    }
+                                                }
+                                            }
+                                        ],
+                                        "outputs": [
+                                            {
+                                                "referenceName": "DS_ADLS_Parquet",
+                                                "type": "DatasetReference",
+                                                "parameters": {
+                                                    "p_table_name": {
+                                                        "value": "@item().table_name",
+                                                        "type": "Expression"
+                                                    },
+                                                    "p_partition": {
+                                                        "value": "@string('')",
+                                                        "type": "Expression"
+                                                    },
+                                                    "p_file_name": {
+                                                        "value": "@concat(item().table_name,'.parquet')",
+                                                        "type": "Expression"
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                ],
+                                "ifTrueActivities": [
+                                    {
+                                        "name": "Copy_Incremental_To_Bronze",
+                                        "type": "Copy",
+                                        "dependsOn": [],
+                                        "policy": {
+                                            "timeout": "0.12:00:00",
+                                            "retry": 0,
+                                            "retryIntervalInSeconds": 30,
+                                            "secureOutput": false,
+                                            "secureInput": false
+                                        },
+                                        "userProperties": [],
+                                        "typeProperties": {
+                                            "source": {
+                                                "type": "AzureSqlSource",
+                                                "sqlReaderQuery": {
+                                                    "value": "@concat(\n    'SELECT * FROM [',\n    item().source_schema,\n    '].[',\n    item().table_name,\n    '] WHERE [',\n    item().watermark_column,\n    '] > ''',\n    formatDateTime(item().last_loaded_at,'yyyy-MM-dd HH:mm:ss'),\n    ''''\n)",
+                                                    "type": "Expression"
+                                                },
+                                                "queryTimeout": "02:00:00",
+                                                "partitionOption": "None"
+                                            },
+                                            "sink": {
+                                                "type": "ParquetSink",
+                                                "storeSettings": {
+                                                    "type": "AzureBlobFSWriteSettings"
+                                                },
+                                                "formatSettings": {
+                                                    "type": "ParquetWriteSettings"
+                                                }
+                                            },
+                                            "enableStaging": false,
+                                            "translator": {
+                                                "type": "TabularTranslator",
+                                                "typeConversion": true,
+                                                "typeConversionSettings": {
+                                                    "allowDataTruncation": true,
+                                                    "treatBooleanAsNumber": false
+                                                }
+                                            }
+                                        },
+                                        "inputs": [
+                                            {
+                                                "referenceName": "DS_AzureSQL_Generic",
+                                                "type": "DatasetReference",
+                                                "parameters": {
+                                                    "p_schema": {
+                                                        "value": "@item().source_schema",
+                                                        "type": "Expression"
+                                                    },
+                                                    "p_table_name": {
+                                                        "value": "@item().table_name",
+                                                        "type": "Expression"
+                                                    }
+                                                }
+                                            }
+                                        ],
+                                        "outputs": [
+                                            {
+                                                "referenceName": "DS_ADLS_Parquet",
+                                                "type": "DatasetReference",
+                                                "parameters": {
+                                                    "p_table_name": {
+                                                        "value": "@item().table_name",
+                                                        "type": "Expression"
+                                                    },
+                                                    "p_partition": {
+                                                        "value": "@concat(\n    'ingest_date=',\n    formatDateTime(variables('run_start_at'),'yyyy-MM-dd')\n)",
+                                                        "type": "Expression"
+                                                    },
+                                                    "p_file_name": {
+                                                        "value": "@concat(item().table_name,'.parquet')",
+                                                        "type": "Expression"
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "name": "Update_Watermark",
+                            "type": "SqlServerStoredProcedure",
+                            "dependsOn": [
+                                {
+                                    "activity": "If_Incremental",
+                                    "dependencyConditions": [
+                                        "Succeeded"
+                                    ]
+                                }
+                            ],
+                            "policy": {
+                                "timeout": "0.12:00:00",
+                                "retry": 0,
+                                "retryIntervalInSeconds": 30,
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "storedProcedureName": "[etl].[usp_update_watermark]",
+                                "storedProcedureParameters": {
+                                    "run_start_at": {
+                                        "value": {
+                                            "value": "@variables('run_start_at')",
+                                            "type": "Expression"
+                                        },
+                                        "type": "DateTime"
+                                    },
+                                    "table_name": {
+                                        "value": {
+                                            "value": "@item().table_name",
+                                            "type": "Expression"
+                                        },
+                                        "type": "String"
+                                    }
+                                }
+                            },
+                            "linkedServiceName": {
+                                "referenceName": "LS_AzureSQL",
+                                "type": "LinkedServiceReference"
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "Copy_Supplier_Prices_To_Bronze",
+                "type": "Copy",
+                "dependsOn": [
+                    {
+                        "activity": "ForEach_Source_Table",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "source": {
+                        "type": "DelimitedTextSource",
+                        "storeSettings": {
+                            "type": "AzureBlobFSReadSettings",
+                            "recursive": true,
+                            "enablePartitionDiscovery": false
+                        },
+                        "formatSettings": {
+                            "type": "DelimitedTextReadSettings"
+                        }
+                    },
+                    "sink": {
+                        "type": "ParquetSink",
+                        "storeSettings": {
+                            "type": "AzureBlobFSWriteSettings"
+                        },
+                        "formatSettings": {
+                            "type": "ParquetWriteSettings"
+                        }
+                    },
+                    "enableStaging": false,
+                    "translator": {
+                        "type": "TabularTranslator",
+                        "typeConversion": true,
+                        "typeConversionSettings": {
+                            "allowDataTruncation": true,
+                            "treatBooleanAsNumber": false
+                        }
+                    }
+                },
+                "inputs": [
+                    {
+                        "referenceName": "DS_ADLS_CSV_Source",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "p_folder_name": "supplier_price_list",
+                            "p_file_name": "supplier_price_list.csv"
+                        }
+                    }
+                ],
+                "outputs": [
+                    {
+                        "referenceName": "DS_ADLS_Parquet",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "p_table_name": "supplier_price_list",
+                            "p_partition": {
+                                "value": "@string('')",
+                                "type": "Expression"
+                            },
+                            "p_file_name": "supplier_price_list.parquet"
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "Copy_Marketing_Spend_To_Bronze",
+                "type": "Copy",
+                "dependsOn": [
+                    {
+                        "activity": "ForEach_Source_Table",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "source": {
+                        "type": "DelimitedTextSource",
+                        "storeSettings": {
+                            "type": "AzureBlobFSReadSettings",
+                            "recursive": true,
+                            "enablePartitionDiscovery": false
+                        },
+                        "formatSettings": {
+                            "type": "DelimitedTextReadSettings"
+                        }
+                    },
+                    "sink": {
+                        "type": "ParquetSink",
+                        "storeSettings": {
+                            "type": "AzureBlobFSWriteSettings"
+                        },
+                        "formatSettings": {
+                            "type": "ParquetWriteSettings"
+                        }
+                    },
+                    "enableStaging": false,
+                    "translator": {
+                        "type": "TabularTranslator",
+                        "typeConversion": true,
+                        "typeConversionSettings": {
+                            "allowDataTruncation": true,
+                            "treatBooleanAsNumber": false
+                        }
+                    }
+                },
+                "inputs": [
+                    {
+                        "referenceName": "DS_ADLS_CSV_Source",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "p_folder_name": "marketing_spend",
+                            "p_file_name": "marketing_spend.csv"
+                        }
+                    }
+                ],
+                "outputs": [
+                    {
+                        "referenceName": "DS_ADLS_Parquet",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "p_table_name": "marketing_spend",
+                            "p_partition": {
+                                "value": "@string('')",
+                                "type": "Expression"
+                            },
+                            "p_file_name": "marketing_spend.parquet"
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "Run_Databricks_Transform",
+                "type": "DatabricksJob",
+                "dependsOn": [
+                    {
+                        "activity": "Copy_Supplier_Prices_To_Bronze",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    },
+                    {
+                        "activity": "Copy_Marketing_Spend_To_Bronze",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "jobId": "638681469902666",
+                    "jobParameters": {
+                        "run_date": {
+                            "value": "@formatDateTime(\n    variables('run_start_at'),\n    'yyyy-MM-dd'\n)",
+                            "type": "Expression"
+                        }
+                    }
+                },
+                "linkedServiceName": {
+                    "referenceName": "LS_Databricks",
+                    "type": "LinkedServiceReference"
+                }
+            }
+        ],
+        "variables": {
+            "run_start_at": {
+                "type": "String"
+            }
+        },
+        "annotations": [],
+        "lastPublishTime": "2026-08-21T19:18:02Z"
+    },
+    "type": "Microsoft.DataFactory/factories/pipelines"
+}

@@ -1,0 +1,24 @@
+{
+    "name": "TR_Nightly_Atliq",
+    "properties": {
+        "annotations": [],
+        "runtimeState": "Started",
+        "pipelines": [
+            {
+                "pipelineReference": {
+                    "referenceName": "PL_Atliq_Nightly",
+                    "type": "PipelineReference"
+                }
+            }
+        ],
+        "type": "ScheduleTrigger",
+        "typeProperties": {
+            "recurrence": {
+                "frequency": "Day",
+                "interval": 1,
+                "startTime": "2026-08-21T19:19:00",
+                "timeZone": "Greenwich Standard Time"
+            }
+        }
+    }
+}

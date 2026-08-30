@@ -1,0 +1,41 @@
+{
+    "name": "DS_ADLS_CSV_Source",
+    "properties": {
+        "linkedServiceName": {
+            "referenceName": "LS_ADLS",
+            "type": "LinkedServiceReference"
+        },
+        "parameters": {
+            "p_folder_name": {
+                "type": "string",
+                "defaultValue": "supplier_price_list"
+            },
+            "p_file_name": {
+                "type": "string",
+                "defaultValue": "supplier_price_list.csv"
+            }
+        },
+        "annotations": [],
+        "type": "DelimitedText",
+        "typeProperties": {
+            "location": {
+                "type": "AzureBlobFSLocation",
+                "fileName": {
+                    "value": "@dataset().p_file_name",
+                    "type": "Expression"
+                },
+                "folderPath": {
+                    "value": "@concat(\n    'landing/',\n    dataset().p_folder_name\n)",
+                    "type": "Expression"
+                },
+                "fileSystem": "lakehouse"
+            },
+            "columnDelimiter": ",",
+            "escapeChar": "\\",
+            "firstRowAsHeader": true,
+            "quoteChar": "\""
+        },
+        "schema": []
+    },
+    "type": "Microsoft.DataFactory/factories/datasets"
+}
