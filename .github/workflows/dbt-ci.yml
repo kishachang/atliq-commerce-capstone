@@ -16,13 +16,11 @@ jobs:
       DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
       DATABRICKS_HTTP_PATH: ${{ secrets.DATABRICKS_HTTP_PATH }}
       DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
-
-      
       DBT_LOCATION_ROOT: abfss://lakehouse@atliqcommercestorage.dfs.core.windows.net/ci
 
     defaults:
       run:
-        working-directory: atliq_gold
+        working-directory: phase1_batch/atliq_gold
 
     steps:
       - name: Checkout repository
